@@ -8,6 +8,7 @@ import {
 } from 'react';
 import useThrottle from '../hooks/useThrottle';
 import Observer, { type ObserverCallback } from './Observer';
+import type { Globals, Property } from 'csstype';
 
 /**
  * The **flex-direction** CSS property sets how flex items are placed in the
@@ -16,11 +17,15 @@ import Observer, { type ObserverCallback } from './Observer';
  *
  * Only explicit values are accepted.
  */
-type FlexDirection = 'row' | 'row-reverse' | 'column' | 'column-reverse';
+type FlexDirection = Exclude<Property.FlexDirection, Globals>;
 
 /**
- * @interface BidirectionalListProps
- * @description Props for the BidrectionalList component.
+ * Incidates which end of the list is triggered.
+ */
+type Action = 'head' | 'tail';
+
+/**
+ * Props for the **BidrectionalList** component.
  */
 interface BidirectionalListProps {
   /**
@@ -97,11 +102,11 @@ type P = Parameters<ObserverCallback>;
 type R = ReturnType<ObserverCallback>;
 
 /**
- * Bidirectional list components shows list items in a direction, and fires
+ * Bidirectional list component shows list items in a direction, and fires
  * callback when it is scrolled to either the head or the tail.
  *
- * @param props - Props for the BidirectionalList component.
- * @returns Rendered bidirectional list component.
+ * @param props - Props for the **BidirectionalList** component.
+ * @returns Rendered bidirectional list component
  */
 export default function BidirectionalList({
   direction,
@@ -157,14 +162,14 @@ export default function BidirectionalList({
   the original scroll view.
   */
 
-  const [action, setAction] = useState<'head' | 'tail' | undefined>();
+  const [action, setAction] = useState<Action | undefined>();
   const scrollWidthRef = useRef(0);
   const scrollHeightRef = useRef(0);
   const scrollLeftRef = useRef(0);
   const scrollTopRef = useRef(0);
 
   const saveScrollStates = useCallback(
-    (pending: 'head' | 'tail') => {
+    (pending: Action) => {
       if (viewportRef.current) {
         if (isColumn) {
           scrollHeightRef.current = viewportRef.current.scrollHeight;
@@ -272,8 +277,11 @@ export default function BidirectionalList({
         className="birectional-list-content"
         style={{
           ...contentStyle,
+          position: 'relative',
           display: 'flex',
           flexDirection: directionMemo,
+          [isColumn ? 'width' : 'height']: '100%',
+          alignItems: 'stretch',
         }}
       >
         {action === 'head' ? (

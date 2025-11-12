@@ -9,12 +9,11 @@ export type ObserverCallback = (
 ) => ReturnType<IntersectionObserverCallback>;
 
 /**
- * @interface ObserverProps
- * @description Props for the Observer component.
+ * Props for the **Observer** component.
  */
 interface ObserverProps {
   /**
-   * Root element for IntersectionObserver.
+   * Root element for **IntersectionObserver**.
    */
   viewport: HTMLDivElement | null;
 
@@ -33,8 +32,8 @@ interface ObserverProps {
  * Observer component helps to observe intersection with the viewport, and
  * fires callback when intersection occurs.
  *
- * @param props - Props for the Observer component.
- * @returns Rendered observer component.
+ * @param props - Props for the **Observer** component
+ * @returns Rendered observer component
  */
 export default function Observer({
   viewport,
@@ -44,7 +43,7 @@ export default function Observer({
   const ref = useRef<HTMLDivElement>(null);
 
   /*
-  Set up native IntersectionObserver. If observer div intersects with the
+  Set up native **IntersectionObserver**. If observer div intersects with the
   viewport, fire the callback.
   */
   useEffect(() => {
