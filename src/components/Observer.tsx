@@ -65,6 +65,7 @@ export default function Observer({
         ...style,
         minWidth: style?.minWidth || '1px',
         minHeight: style?.minHeight || '1px',
+        pointerEvents: 'none',
       }}
     />
   );
