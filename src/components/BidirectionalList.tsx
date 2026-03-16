@@ -290,6 +290,7 @@ export default function BidirectionalList({
           <Observer
             viewport={viewport}
             style={headObserverStyle}
+            testId="head-observer"
             onIntersect={onHeadThrottled}
           />
         )}
@@ -300,6 +301,7 @@ export default function BidirectionalList({
           <Observer
             viewport={viewport}
             style={tailObserverStyle}
+            testId="tail-observer"
             onIntersect={onTailThrottled}
           />
         )}

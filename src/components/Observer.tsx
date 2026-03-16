@@ -26,6 +26,11 @@ interface ObserverProps {
    *  Callback that fires when intersection occurs.
    */
   onIntersect: ObserverCallback;
+
+  /**
+   * Optional test identifier used by E2E tests.
+   */
+  testId?: string;
 }
 
 /**
@@ -39,6 +44,7 @@ export default function Observer({
   viewport,
   style,
   onIntersect,
+  testId,
 }: ObserverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -61,6 +67,7 @@ export default function Observer({
   return (
     <div
       ref={ref}
+      data-testid={testId}
       style={{
         ...style,
         minWidth: style?.minWidth || '1px',
