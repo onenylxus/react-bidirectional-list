@@ -29,9 +29,14 @@ interface TestListProps {
 
   /**
    * Number of items to load when callback fires. Actual number may be smaller
-   * if the list reaches the limits. By default the value is `10`.
+   * if the list reaches the limits. By default the value is `20`.
    */
   batchSize?: number;
+
+  /**
+   * Time interval (in milliseconds) to throttle callback functions.
+   */
+  throttleDelay?: number;
 
   /**
    * The list will stop generating items at the head if ID value exceeds the
@@ -44,6 +49,41 @@ interface TestListProps {
    * maximum. The limit is lifted if maximum is not provided.
    */
   idMax?: number;
+
+  /**
+   * Explicitly control whether loading at the head is enabled.
+   */
+  hasMoreAtHead?: boolean;
+
+  /**
+   * Explicitly control whether loading at the tail is enabled.
+   */
+  hasMoreAtTail?: boolean;
+
+  /**
+   * Disable data mutation when observer callbacks fire.
+   */
+  mutateOnHit?: boolean;
+
+  /**
+   * Number of initial items, starting from 0. Default is `20`.
+   */
+  initialCount?: number;
+
+  /**
+   * Callback fired each time the head observer callback is triggered.
+   */
+  onHeadHit?: () => void;
+
+  /**
+   * Callback fired each time the tail observer callback is triggered.
+   */
+  onTailHit?: () => void;
+
+  /**
+   * Optional viewport style overrides.
+   */
+  viewportStyle?: React.CSSProperties;
 }
 
 /**
@@ -57,9 +97,17 @@ interface TestListProps {
  */
 export default function TestList({
   direction,
-  batchSize = 10,
+  batchSize = 20,
   idMin,
   idMax,
+  throttleDelay,
+  hasMoreAtHead,
+  hasMoreAtTail,
+  mutateOnHit = true,
+  initialCount = 20,
+  onHeadHit,
+  onTailHit,
+  viewportStyle,
 }: TestListProps) {
   /*
   Determine CSS property keys and values based on direction.
@@ -67,54 +115,69 @@ export default function TestList({
   const isRow = useMemo(() => direction.includes('row'), [direction]);
   const mainAxisKey = useMemo(() => (isRow ? 'width' : 'height'), [isRow]);
   const crossAxisKey = useMemo(() => (isRow ? 'height' : 'width'), [isRow]);
-  const listSize = useMemo(() => (isRow ? '75vw' : '75vh'), [isRow]);
-  const listItemMainSize = useMemo(() => (isRow ? '25vw' : '25vh'), [isRow]);
-  const listItemCrossSize = useMemo(() => (isRow ? '10vh' : '10vw'), [isRow]);
+  const listSize = useMemo(() => (isRow ? '520px' : '480px'), [isRow]);
+  const itemSize = useMemo(() => '32px', []);
 
   /*
   Store data in an array, and perform data control.
   */
-  const [data, setData] = useState<TestData[]>([
-    { id: 0, size: listItemMainSize, color: '#f8f8f8' },
-  ]);
+  const [data, setData] = useState<TestData[]>(
+    Array.from(
+      { length: initialCount },
+      (_, index): TestData => ({
+        id: index,
+        size: itemSize,
+        color: index === 0 ? '#f8f8f8' : randHexColor(),
+      }),
+    ),
+  );
 
   const min = useMemo(() => data.at(0)?.id ?? 0, [data]);
   const max = useMemo(() => data.at(-1)?.id ?? 0, [data]);
 
   const unshiftData = useCallback(() => {
-    const count = idMin
-      ? Math.max(Math.min(min - idMin, 0), batchSize)
-      : batchSize;
+    onHeadHit?.();
+    if (!mutateOnHit) return;
+
+    const allowed = idMin === undefined ? batchSize : Math.max(min - idMin, 0);
+    const count = Math.min(batchSize, allowed);
     if (count === 0) return;
 
     const newData = Array.from(
       { length: count },
       (_, k): TestData => ({
         id: min - count + k,
-        size: listItemMainSize,
+        size: itemSize,
         color: randHexColor(),
       }),
     );
 
     setData((prevData) => [...newData, ...prevData]);
-  }, [batchSize, idMin, listItemMainSize, min]);
+  }, [batchSize, idMin, itemSize, min, mutateOnHit, onHeadHit]);
 
   const pushData = useCallback(() => {
-    const count = idMax
-      ? Math.max(Math.min(max - idMax, 0), batchSize)
-      : batchSize;
+    onTailHit?.();
+    if (!mutateOnHit) return;
+
+    const allowed = idMax === undefined ? batchSize : Math.max(idMax - max, 0);
+    const count = Math.min(batchSize, allowed);
     if (count === 0) return;
 
     const newData = Array.from(
       { length: count },
       (_, k): TestData => ({
         id: max + 1 + k,
-        size: listItemMainSize,
+        size: itemSize,
         color: randHexColor(),
       }),
     );
     setData((prevData) => [...prevData, ...newData]);
-  }, [batchSize, idMax, listItemMainSize, max]);
+  }, [batchSize, idMax, itemSize, max, mutateOnHit, onTailHit]);
+
+  const hasMoreHeadResolved =
+    hasMoreAtHead ?? (idMin === undefined ? true : min > idMin);
+  const hasMoreTailResolved =
+    hasMoreAtTail ?? (idMax === undefined ? true : max < idMax);
 
   /*
   Converts data into list items.
@@ -122,12 +185,14 @@ export default function TestList({
   return (
     <BidirectionalList
       direction={direction}
-      hasMoreAtHead={idMax ? max < idMax : true}
-      hasMoreAtTail={idMin ? min < idMin : true}
+      hasMoreAtHead={hasMoreHeadResolved}
+      hasMoreAtTail={hasMoreTailResolved}
+      throttleDelay={throttleDelay}
       viewportStyle={{
         border: '3px solid #000',
         [mainAxisKey]: listSize,
-        [crossAxisKey]: listItemCrossSize,
+        [crossAxisKey]: itemSize,
+        ...viewportStyle,
       }}
       onHead={unshiftData}
       onTail={pushData}
@@ -136,7 +201,8 @@ export default function TestList({
         <TestListItem
           key={id}
           itemId={id}
-          {...{ [mainAxisKey]: size }}
+          width={size}
+          height={size}
           color={color}
         />
       ))}

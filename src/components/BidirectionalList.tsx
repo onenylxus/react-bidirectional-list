@@ -382,6 +382,12 @@ export default function BidirectionalList({
           display: 'flex',
           flexDirection: directionMemo,
           [isColumn ? 'width' : 'height']: '100%',
+          ...(!isColumn
+            ? {
+                width: 'max-content',
+                minWidth: '100%',
+              }
+            : null),
           alignItems: 'stretch',
         }}
       >

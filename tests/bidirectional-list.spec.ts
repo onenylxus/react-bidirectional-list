@@ -119,13 +119,6 @@ test.describe('BidirectionalList visual behavior across directions', () => {
     test(`loads additional items when scrolled to both boundaries (${direction})`, async ({
       page,
     }) => {
-      if (direction === 'row-reverse') {
-        test.fail(
-          true,
-          'Known issue: row-reverse currently does not trigger both observers consistently',
-        );
-      }
-
       await page.goto('/');
 
       const select = page.getByTestId('direction-select');
@@ -180,16 +173,6 @@ test.describe('BidirectionalList initial focus placement', () => {
       test(`sets initial focus for ${mode} (${direction})`, async ({
         page,
       }) => {
-        if (
-          direction === 'row-reverse' &&
-          (mode === 'both' || mode === 'head-only')
-        ) {
-          test.fail(
-            true,
-            'Known issue: row-reverse currently has inconsistent boundary behavior',
-          );
-        }
-
         await page.goto(`/?direction=${direction}&mode=${mode}&mutate=false`);
 
         const viewport = page.locator('.bidirectional-list-viewport');
@@ -210,4 +193,57 @@ test.describe('BidirectionalList initial focus placement', () => {
       });
     }
   }
+});
+
+test.describe('BidirectionalList boundary batch size', () => {
+  test('row-reverse has real horizontal overflow', async ({ page }) => {
+    await page.goto('/?direction=row-reverse&mode=both');
+
+    const viewport = page.locator('.bidirectional-list-viewport');
+    await expect(viewport).toBeVisible();
+
+    const metrics = await viewport.evaluate((element) => {
+      const node = element as HTMLDivElement;
+      return {
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth,
+        overflowX: window.getComputedStyle(node).overflowX,
+      };
+    });
+
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+    expect(metrics.overflowX).toBe('auto');
+  });
+
+  test('adds 20 items at tail boundary (row)', async ({ page }) => {
+    await page.goto('/?direction=row&mode=tail-only');
+
+    await expect(page.locator('.e2e-item').first()).toBeVisible();
+    const baseline = await readStats(page);
+    expect(baseline.count).toBe(20);
+
+    await page.getByTestId('tail-observer').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(180);
+
+    const after = await readStats(page);
+    expect(after.count).toBe(baseline.count + 20);
+    expect(after.min).toBe(baseline.min);
+    expect(after.max).toBe(baseline.max + 20);
+  });
+
+  test('adds 20 items at head boundary (row)', async ({ page }) => {
+    await page.goto('/?direction=row&mode=head-only');
+
+    await expect(page.locator('.e2e-item').first()).toBeVisible();
+    const baseline = await readStats(page);
+    expect(baseline.count).toBe(20);
+
+    await page.getByTestId('head-observer').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(180);
+
+    const after = await readStats(page);
+    expect(after.count).toBe(baseline.count + 20);
+    expect(after.min).toBe(baseline.min - 20);
+    expect(after.max).toBe(baseline.max);
+  });
 });
