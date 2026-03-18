@@ -23,6 +23,11 @@ interface ObserverProps {
   style?: React.CSSProperties;
 
   /**
+   * Optional ref to the observer div element.
+   */
+  observerRef?: React.RefObject<HTMLDivElement | null>;
+
+  /**
    *  Callback that fires when intersection occurs.
    */
   onIntersect: ObserverCallback;
@@ -43,6 +48,7 @@ interface ObserverProps {
 export default function Observer({
   viewport,
   style,
+  observerRef,
   onIntersect,
   testId,
 }: ObserverProps) {
@@ -66,7 +72,10 @@ export default function Observer({
 
   return (
     <div
-      ref={ref}
+      ref={(node) => {
+        ref.current = node;
+        if (observerRef) observerRef.current = node;
+      }}
       data-testid={testId}
       style={{
         ...style,

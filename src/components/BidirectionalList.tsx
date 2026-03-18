@@ -1,4 +1,5 @@
 import {
+  Children,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -101,6 +102,36 @@ interface BidirectionalListProps {
 type P = Parameters<ObserverCallback>;
 type R = ReturnType<ObserverCallback>;
 
+function getScrollBounds(viewport: HTMLDivElement, isColumn: boolean) {
+  if (isColumn) {
+    const original = viewport.scrollTop;
+    const values = [original];
+
+    viewport.scrollTop = -Number.MAX_SAFE_INTEGER;
+    values.push(viewport.scrollTop);
+    viewport.scrollTop = Number.MAX_SAFE_INTEGER;
+    values.push(viewport.scrollTop);
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    viewport.scrollTop = original;
+    return { min, max };
+  }
+
+  const original = viewport.scrollLeft;
+  const values = [original];
+
+  viewport.scrollLeft = -Number.MAX_SAFE_INTEGER;
+  values.push(viewport.scrollLeft);
+  viewport.scrollLeft = Number.MAX_SAFE_INTEGER;
+  values.push(viewport.scrollLeft);
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  viewport.scrollLeft = original;
+  return { min, max };
+}
+
 /**
  * Bidirectional list component shows list items in a direction, and fires
  * callback when it is scrolled to either the head or the tail.
@@ -151,7 +182,11 @@ export default function BidirectionalList({
   */
 
   const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const headObserverRef = useRef<HTMLDivElement>(null);
+  const tailObserverRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
+  const initialPositionedRef = useRef(false);
 
   useEffect(() => {
     if (viewportRef.current) setViewport(viewportRef.current);
@@ -244,6 +279,71 @@ export default function BidirectionalList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [children]);
 
+  useLayoutEffect(() => {
+    if (
+      initialPositionedRef.current ||
+      action ||
+      !viewportRef.current ||
+      !contentRef.current
+    )
+      return;
+    if (Children.count(children) === 0) return;
+
+    const frame = requestAnimationFrame(() => {
+      if (!viewportRef.current || !contentRef.current) return;
+
+      const { min, max } = getScrollBounds(viewportRef.current, isColumn);
+      const hasScrollableRange = max !== min;
+
+      if (hasScrollableRange) {
+        const isReverse = directionMemo.endsWith('reverse');
+        const head = isReverse ? max : min;
+        const tail = isReverse ? min : max;
+        const center = (min + max) / 2;
+
+        let target = head;
+        if (hasMoreAtHead && hasMoreAtTail) {
+          target = center;
+        } else if (hasMoreAtHead) {
+          target = tail;
+        }
+
+        if (isColumn) {
+          viewportRef.current.scrollTop = target;
+        } else {
+          viewportRef.current.scrollLeft = target;
+        }
+
+        initialPositionedRef.current = true;
+        return;
+      }
+
+      let target: Element | null = headObserverRef.current;
+
+      if (hasMoreAtHead && hasMoreAtTail) {
+        const childrenCount = contentRef.current.children.length;
+        const firstDataIndex = 1;
+        const lastDataIndex = childrenCount - 2;
+
+        if (lastDataIndex >= firstDataIndex) {
+          const middleDataIndex =
+            firstDataIndex + Math.floor((lastDataIndex - firstDataIndex) / 2);
+          target = contentRef.current.children.item(middleDataIndex);
+        }
+      } else if (hasMoreAtHead) {
+        target = tailObserverRef.current;
+      }
+
+      if (target instanceof HTMLElement) {
+        target.scrollIntoView({ block: 'center', inline: 'center' });
+      }
+
+      initialPositionedRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [action, children, directionMemo, hasMoreAtHead, hasMoreAtTail, isColumn]);
+
   /*
   Throttle the callbacks to prevent unexpected repeat calls.
   */
@@ -274,6 +374,7 @@ export default function BidirectionalList({
       }}
     >
       <div
+        ref={contentRef}
         className="birectional-list-content"
         style={{
           ...contentStyle,
@@ -289,6 +390,7 @@ export default function BidirectionalList({
         ) : (
           <Observer
             viewport={viewport}
+            observerRef={headObserverRef}
             style={headObserverStyle}
             testId="head-observer"
             onIntersect={onHeadThrottled}
@@ -300,6 +402,7 @@ export default function BidirectionalList({
         ) : (
           <Observer
             viewport={viewport}
+            observerRef={tailObserverRef}
             style={tailObserverStyle}
             testId="tail-observer"
             onIntersect={onTailThrottled}
